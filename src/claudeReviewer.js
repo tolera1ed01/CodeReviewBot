@@ -30,7 +30,11 @@ Only flag real issues. If the code looks good, say so in the summary and leave i
 
 export async function reviewDiff(diff, pr) {
   if (!diff || diff.trim().length === 0) {
-    return { summary: 'No reviewable changes found in this PR.', issues: [], positives: [] };
+    return { summary: 'No reviewable changes found.', issues: [], positives: [] };
+  }
+
+  if (diff.trim().split('\n').length < 3) {
+    return { summary: 'Change is too small to review.', issues: [], positives: [] };
   }
 
   const prompt = [
