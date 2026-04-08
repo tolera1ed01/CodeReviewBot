@@ -49,6 +49,8 @@ export async function reviewDiff(diff, pr) {
     '```',
   ].filter(Boolean).join('\n');
 
+  // Streaming avoids HTTP timeouts when the model takes a while on large diffs.
+  // We collect all chunks into a single string before parsing.
   const result = await model.generateContentStream(prompt);
 
   let responseText = '';
@@ -61,10 +63,15 @@ export async function reviewDiff(diff, pr) {
 
 function parseReview(text) {
   try {
+    // Extract the first {...} block from the response. The model is instructed
+    // to return only JSON, but occasionally wraps it in prose or markdown —
+    // this regex handles that gracefully.
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) return JSON.parse(jsonMatch[0]);
   } catch {
     // fall through to fallback
   }
+  // If JSON parsing fails entirely, surface the raw text as the summary so
+  // the review is still posted rather than silently dropped.
   return { summary: text.trim(), issues: [], positives: [] };
 }

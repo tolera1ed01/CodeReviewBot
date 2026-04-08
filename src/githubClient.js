@@ -8,6 +8,8 @@ const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 export async function getPRFiles(repo, prNumber) {
   const [owner, repoName] = repo.split('/');
 
+  // per_page: 50 — GitHub's default is 30, cap is 100. 50 keeps payloads
+  // manageable while still covering most PRs in a single request.
   const { data: files } = await octokit.pulls.listFiles({
     owner,
     repo: repoName,
@@ -35,10 +37,13 @@ export async function getCommitFiles(repo, sha) {
 
 function buildDiff(files) {
   const diff = files
-    .filter(f => f.patch)
+    // Skip deleted files (no patch to review) and files with no diff data.
+    .filter(f => f.patch && f.status !== 'removed')
+    // Format as a standard unified diff so the AI model can parse it easily.
     .map(f => `--- a/${f.filename}\n+++ b/${f.filename}\n${f.patch}`)
     .join('\n\n');
 
+  // Hard cap at 100KB to stay within model context limits and avoid runaway costs.
   if (diff.length > 100_000) {
     return diff.slice(0, 100_000) + '\n\n... (diff truncated — too large to review fully)';
   }
@@ -56,6 +61,8 @@ export async function hasAlreadyReviewed(repo, prNumber, commitSha) {
     repo: repoName,
     pull_number: prNumber,
   });
+  // Match both the bot marker (so we don't flag human reviews) and the exact
+  // commit SHA so a new push to the same PR always gets its own fresh review.
   return reviews.some(r =>
     r.body &&
     r.body.includes('🤖 Code Review') &&

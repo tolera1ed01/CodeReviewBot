@@ -2,6 +2,9 @@ import crypto from 'crypto';
 import { getPRFiles, getCommitFiles, postReview, postCommitComment, hasAlreadyReviewed, hasCommitReview } from './githubClient.js';
 import { reviewDiff } from './claudeReviewer.js';
 
+// Verifies the HMAC-SHA256 signature GitHub attaches to every webhook delivery.
+// Uses timingSafeEqual to prevent timing attacks — regular string comparison
+// leaks information about how many characters match.
 function verifySignature(rawBody, signature) {
   if (!signature) return false;
   const expected = 'sha256=' + crypto
@@ -11,6 +14,7 @@ function verifySignature(rawBody, signature) {
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
   } catch {
+    // timingSafeEqual throws if the two buffers are different lengths
     return false;
   }
 }
@@ -27,6 +31,8 @@ export async function handleWebhook(req, res) {
   const repo    = payload.repository.full_name;
 
   // ── Pull request events ──────────────────────────────────────────────────
+  // Reviews the full PR diff on open, reopen, or whenever new commits are pushed.
+  // Deduped by commit SHA so each push to the PR gets its own review.
   if (event === 'pull_request') {
     if (!['opened', 'synchronize', 'reopened'].includes(payload.action)) {
       return res.status(200).json({ status: 'ignored' });
@@ -52,7 +58,11 @@ export async function handleWebhook(req, res) {
     }
   }
 
-  // ── Push events (commits to default branch) ──────────────────────────────
+  // ── Push events ──────────────────────────────────────────────────────────
+  // Reviews individual commits pushed directly to the default branch.
+  // Skips feature branches — those are handled via pull_request events above.
+  // `distinct: true` filters out commits already seen in a previous push
+  // (e.g. from a merged PR), avoiding double reviews.
   if (event === 'push') {
     const defaultRef = `refs/heads/${payload.repository.default_branch}`;
     if (payload.ref !== defaultRef) {
