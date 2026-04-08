@@ -1,0 +1,31 @@
+name: 'CodeReviewBot'
+description: 'Automated AI code review on pull requests and commits using Gemini'
+author: 'tolera1ed01'
+
+inputs:
+  gemini-api-key:
+    description: 'Gemini API key for AI-powered reviews'
+    required: true
+  github-token:
+    description: 'GitHub token for posting review comments (defaults to the workflow token)'
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: ${{ github.action_path }}/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci --prefix ${{ github.action_path }}
+      shell: bash
+
+    - name: Run code review
+      run: node ${{ github.action_path }}/src/main.js
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
