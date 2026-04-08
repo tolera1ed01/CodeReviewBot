@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { getPRFiles, getCommitFiles, postReview, postCommitComment, hasAlreadyReviewed, hasCommitReview } from './githubClient.js';
-import { reviewDiff } from './claudeReviewer.js';
+import { reviewDiff } from './geminiReviewer.js';
 
 const eventName = process.env.GITHUB_EVENT_NAME;
 const repo      = process.env.GITHUB_REPOSITORY; // "owner/repo"
