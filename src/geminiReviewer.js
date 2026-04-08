@@ -51,14 +51,29 @@ export async function reviewDiff(diff, pr) {
 
   // Streaming avoids HTTP timeouts when the model takes a while on large diffs.
   // We collect all chunks into a single string before parsing.
-  const result = await model.generateContentStream(prompt);
-
-  let responseText = '';
-  for await (const chunk of result.stream) {
-    responseText += chunk.text();
+  // Retry up to 3 times on 503 (model overloaded) with exponential backoff.
+  const MAX_RETRIES = 3;
+  let lastError;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, 2 ** attempt * 1000));
+    }
+    try {
+      const result = await model.generateContentStream(prompt);
+      let responseText = '';
+      for await (const chunk of result.stream) {
+        responseText += chunk.text();
+      }
+      return parseReview(responseText);
+    } catch (err) {
+      if (err.status === 503) {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
   }
-
-  return parseReview(responseText);
+  throw lastError;
 }
 
 function parseReview(text) {
