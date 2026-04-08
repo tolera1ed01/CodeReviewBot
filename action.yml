@@ -13,16 +13,26 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # github.action_path can contain a relative '.' segment when the action is
+    # referenced via uses: ./ — realpath normalises it to an absolute path so
+    # the cache-dependency-path below doesn't throw an "Invalid pattern" error.
+    - name: Resolve action path
+      id: resolve
+      run: echo "path=$(realpath '${{ github.action_path }}')" >> $GITHUB_OUTPUT
+      shell: bash
+
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: ${{ steps.resolve.outputs.path }}/package-lock.json
 
     - name: Install dependencies
-      run: npm ci --prefix ${{ github.action_path }}
+      run: npm ci --prefix '${{ github.action_path }}'
       shell: bash
 
     - name: Run code review
-      run: node ${{ github.action_path }}/src/main.js
+      run: node '${{ github.action_path }}/src/main.js'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
