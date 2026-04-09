@@ -13,18 +13,22 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - id: resolve-path
+      run: echo "action_path=$(realpath '${{ github.action_path }}')" >> $GITHUB_OUTPUT
+      shell: bash
+
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: ${{ github.action_path }}/package-lock.json
+        cache-dependency-path: ${{ steps.resolve-path.outputs.action_path }}/package-lock.json
 
     - name: Install dependencies
-      run: npm ci --prefix "${{ github.action_path }}"
+      run: npm ci --prefix "${{ steps.resolve-path.outputs.action_path }}"
       shell: bash
 
     - name: Run code review
-      run: node "${{ github.action_path }}/src/main.js"
+      run: node "${{ steps.resolve-path.outputs.action_path }}/src/main.js"
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
