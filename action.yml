@@ -13,22 +13,18 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Resolve action path
-      run: echo "CODEBOT_ACTION_PATH=$(realpath '${{ github.action_path }}')" >> $GITHUB_ENV
-      shell: bash
-
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: ${{ env.CODEBOT_ACTION_PATH }}/package-lock.json
+        cache-dependency-path: ${{ github.action_path }}/package-lock.json
 
     - name: Install dependencies
-      run: npm ci --prefix "$CODEBOT_ACTION_PATH"
+      run: npm ci --prefix "${{ github.action_path }}"
       shell: bash
 
     - name: Run code review
-      run: node "$CODEBOT_ACTION_PATH/src/main.js"
+      run: node "${{ github.action_path }}/src/main.js"
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
